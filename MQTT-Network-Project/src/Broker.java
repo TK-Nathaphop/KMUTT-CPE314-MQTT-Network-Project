@@ -11,7 +11,7 @@ import java.util.ArrayList;
 public class Broker extends Thread
 {
 	/** Port of server **/
-	private static int port = 80;
+	private static int port = 9999;
 	
 	/** Server **/
 	private static ServerSocket server;
@@ -38,10 +38,11 @@ public class Broker extends Thread
 		{
 			try
 			{ 
-				System.out.println("Waiting for connection on " + server.getLocalPort());
+				System.out.println("Waiting for connection on port " + server.getLocalPort());
 				
 				/* The Client is connect to the server */
 				Socket socket = server.accept();
+				System.out.println("Have client connected");
 				Client client = new Client(socket);
 				clientList.add(client);
 				
@@ -78,7 +79,7 @@ public class Broker extends Thread
 	 * Send all client out.
 	 * @return Array list of client
 	 */
-	public static ArrayList getAllClient()
+	public static ArrayList<Client> getAllClient()
 	{
 		return clientList;
 	}
@@ -103,11 +104,15 @@ class Client extends Thread
 	
 	/** Path connection **/
 	private String topic;
+	
+	private int id;
+	
 
 	/** Constructor for client 
 	 * @throws IOException **/
 	public Client(Socket socket) throws IOException
 	{
+		id = Broker.getAllClient().size();
 		this.setSocket(socket);
 	}
 
@@ -138,17 +143,17 @@ class Client extends Thread
 	private String[] checkCommand(String command)
 	{
 		String split[] = command.split(" ");
+		if(split.length < 2)
+			return null;
 		if(split[0].equals("subscribe"))
-		{
 			if(split.length != 2)
 				split = null;
 			
-		}
 		else if(split[0].equals("publish"))
-		{
 			if(split.length != 3)
 				split = null;
-		}
+		else
+			split = null;
 		
 		/* Check the path is correct or not */
 		if(split[1].charAt(0) != '/')
@@ -208,7 +213,7 @@ class Client extends Thread
 		{
 			publisher(fields);
 		}
-		
+		System.out.println("Client is disconnected\n");
 		try
 		{
 			input.close();
@@ -228,6 +233,7 @@ class Client extends Thread
 	 */
 	public void subscriber()
 	{
+		System.out.println("Client is subscriber\n");
 		while(socket.isConnected());
 	}
 	
@@ -238,12 +244,10 @@ class Client extends Thread
 	 */
 	public boolean checkTopic(String topic)
 	{
-		boolean ret = false;
 		if(topic.equals(this.topic))
-			ret = false;
+			return true;
 		else
-			ret = true;
-		return ret;
+			return false;
 	}
 	
 	/**
@@ -269,9 +273,14 @@ class Client extends Thread
 	 */
 	public void publisher(String fields[])
 	{
-		ArrayList clientList = Broker.getAllClient();
+		System.out.println("Client is publisher\n");
+		ArrayList<Client> clientList = Broker.getAllClient();
+		System.out.println("Message: "+ fields[2]);
 		for (int i = 0; i < clientList.size(); i++)
-			if(checkTopic(this.topic))
-				writeOutput(fields[2]);
+			if(clientList.get(i).checkTopic(this.topic))
+			{
+				System.out.println("Write to subscriber id " + id +": " + fields[2]);
+				clientList.get(i).writeOutput(fields[2]);
+			}
 	}
 }
