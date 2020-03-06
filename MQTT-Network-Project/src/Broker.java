@@ -8,10 +8,10 @@ import java.util.ArrayList;
  * @author Group No.4
  *
  */
-public class Broker extends Thread
+public class Broker
 {
 	/** Port of server **/
-	private static int port = 9999;
+	private static int port = 50000;
 	
 	/** Server **/
 	private static ServerSocket server;
@@ -43,11 +43,13 @@ public class Broker extends Thread
 				/* The Client is connect to the server */
 				Socket socket = server.accept();
 				System.out.println("Have client connected");
+				
 				Client client = new Client(socket);
 				clientList.add(client);
 				
 				/* Start thread */
 				client.start();
+				Thread.sleep(500);
 			}
 			catch (Exception e)
 			{
@@ -72,7 +74,7 @@ public class Broker extends Thread
 	 */
 	public void setPort(int port)
 	{
-		this.port = port;
+		Broker.port = port;
 	}
 	
 	/**
@@ -82,6 +84,11 @@ public class Broker extends Thread
 	public static ArrayList<Client> getAllClient()
 	{
 		return clientList;
+	}
+	
+	public static void removeClient(Client client)
+	{
+		clientList.remove(client);
 	}
 }
 
@@ -97,39 +104,107 @@ class Client extends Thread
 	private Socket socket;
 	
 	/** Input stream for sending data to client **/
-	private DataInputStream input;
+	private DataInputStream in;
 	
 	/** Output stream for receiving data from client **/
-	private DataOutputStream output;
+	private DataOutputStream out;
 	
 	/** Path connection **/
 	private String topic;
 	
+	/** Identifier it's subscriber or publisher */
+	private boolean bSub;
+	
 	private int id;
+	
+	private static int counter = 0;
 	
 
 	/** Constructor for client 
 	 * @throws IOException **/
-	public Client(Socket socket) throws IOException
+	public Client(Socket socket)
 	{
-		id = Broker.getAllClient().size();
-		this.setSocket(socket);
-	}
-
-	/**
-	 * Set the socket and get input stream and output stream from socket
-	 * @param socket The socket connection from client
-	 * @throws IOException
-	 */
-	private void setSocket(Socket socket) throws IOException
-	{
+		id = counter;
+		counter++;
 		this.socket = socket;
 		try
 		{
-			input = new DataInputStream(socket.getInputStream());
-			output = new DataOutputStream(socket.getOutputStream());
+			initialMessage();
 		}
-		catch (Exception e)
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+
+	/** Running thread. Get command and data from client, then check that
+	 * either subscriber or publisher.
+	 * If subscriber, loop receive get input.
+	 * If publisher, just send data to all related subscriber.
+	 */
+	public void run()
+	{
+		/* Get the data command from client */
+		String message = null;
+		
+		try
+		{
+			message = readMessage();
+		}
+		catch (IOException e1)
+		{
+			e1.printStackTrace();
+		}
+
+		String fields[] = checkCommand(message);
+		
+		/* If get null from check command, means the command is wrong */
+		if(fields == null)
+		{
+			System.out.println("Error from data sending");
+			try
+			{
+				endMessage();
+				socket.close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+			
+		}
+		
+		/* Keep the topic */
+		this.topic = fields[1];
+		
+		/** If it is subscriber, loop and wait until exit */
+		if(fields[0].equals("subscribe"))
+		{
+			bSub = true;
+			subscriber();
+		}
+
+		/** If it is publisher, send the data to all subscriber in topic */
+		else if(fields[0].equals("publish"))
+		{
+			bSub = false;
+			try
+			{
+				publisher(fields[2]);
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
+		
+		Broker.removeClient(this);
+		System.out.println("Client is disconnected\n");
+		try
+		{
+			endMessage();
+		}
+		catch (IOException e)
 		{
 			e.printStackTrace();
 		}
@@ -161,71 +236,6 @@ class Client extends Thread
 		return split;
 	}
 	
-	/** Running thread. Get command and data from client, then check that
-	 * either subscriber or publisher.
-	 * If subscriber, loop receive get input.
-	 * If publisher, just send data to all related subscriber.
-	 */
-	public void run()
-	{
-		/* Get the data command from client */
-		String message = null;
-		
-		try
-		{
-			message = input.readUTF();
-		}
-		catch (IOException e1)
-		{
-			e1.printStackTrace();
-		}
-
-		String fields[] = checkCommand(message);
-		
-		/* If get null from check command, means the command is wrong */
-		if(fields == null)
-		{
-			System.out.println("Error from data sending");
-			try
-			{
-				input.close();
-				output.close();
-			}
-			catch (IOException e)
-			{
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-		}
-		
-		/* Keep the topic */
-		topic = fields[1];
-		
-		/** If it is subscriber, loop and wait until exit */
-		if(fields[0].equals("subscribe"))
-		{
-			subscriber();
-		}
-		
-		/** If it is publisher, send the data to all subscriber in topic */
-		else if(fields[0].equals("publish"))
-		{
-			publisher(fields);
-		}
-		System.out.println("Client is disconnected\n");
-		try
-		{
-			input.close();
-			output.close();
-		}
-		catch (IOException e)
-		{
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
 	/**
 	 * Continue loop and waiting publisher to publish the data
 	 * until use "exit" command.
@@ -233,8 +243,51 @@ class Client extends Thread
 	 */
 	public void subscriber()
 	{
+		String message = "";
 		System.out.println("Client is subscriber\n");
-		while(socket.isConnected());
+		while(!message.equals("exit"))
+		{
+			try
+			{
+				message = readMessage();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	
+	/**
+	 * Get input and send to all subscriber
+	 * @param fields
+	 * @throws IOException 
+	 */
+	public void publisher(String message) throws IOException
+	{
+		System.out.println("Client is publisher\n");
+		ArrayList<Client> clientList = Broker.getAllClient();
+		
+		/** Loop send message to all subscriber in topic **/
+		for (int i = 0; i < clientList.size(); i++)
+		{
+			Client client = clientList.get(i);
+			if(client.isSub() && client.checkTopic(this.topic))
+			{
+				System.out.println("Write to subscriber id " + id +": " + message);
+				client.writeMessage(message);
+			}
+		}
+		
+		/** Wait for exit command from publisher **/
+		String exit = readMessage();
+		if(!exit.equals("exit"))
+		{
+			System.out.println("Error: Cannot get exit message from publisher");
+			System.out.println("Error occur exit program");
+			System.exit(0);
+		}
 	}
 	
 	/**
@@ -250,37 +303,79 @@ class Client extends Thread
 			return false;
 	}
 	
-	/**
-	 * Send the message to current subscriber
-	 * @param message
-	 */
-	public void writeOutput(String message)
+	public boolean isSub()
 	{
-		try
-		{
-			output.writeUTF(message);
-		}
-		catch (IOException e)
-		{
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		return bSub;
 	}
 	
 	/**
-	 * Get input and send to all subscriber
-	 * @param fields
+	 * Read message from server and send the acknowledge message back 
+	 * @return Message that reading from server
+	 * @throws IOException
 	 */
-	public void publisher(String fields[])
+	public String readMessage() throws IOException
 	{
-		System.out.println("Client is publisher\n");
-		ArrayList<Client> clientList = Broker.getAllClient();
-		System.out.println("Message: "+ fields[2]);
-		for (int i = 0; i < clientList.size(); i++)
-			if(clientList.get(i).checkTopic(this.topic))
-			{
-				System.out.println("Write to subscriber id " + id +": " + fields[2]);
-				clientList.get(i).writeOutput(fields[2]);
-			}
+		String message = null;
+		if(in != null)
+			message = in.readUTF();
+//		if(out != null)
+//			out.writeUTF("[ACK] " + message);
+		return message;
+	}
+	
+	/**
+	 * Write message to server and wait for acknowledge from server
+	 * @param message
+	 * @return Return true if can write successfully. Otherwise, false.
+	 * @throws IOException
+	 */
+	public boolean writeMessage(String message) throws IOException
+	{
+		boolean ret = true;
+		int count = 0;
+		int limit = 5;
+		if(out != null)
+			out.writeUTF(message);
+//		String ack;
+//		if(in != null)
+//		{
+//			do
+//			{
+//				ack = in.readUTF();
+//				if(!ack.equals("[ACK] " + message) && count < limit)
+//				{
+//					System.out.println("Cannot get [ACK] message from socket");
+//					System.out.println("["+count +"]" + "Try sending again");
+//					count++;
+//				}
+//				else if(count == limit)
+//				{
+//					System.out.println("Cannot get [ACK] message from socket");
+//					System.out.println("Exceeding limit [" + limit + "]. Stop sending ");
+//					ret = false;
+//				}
+//			}while (!ack.equals("[ACK] " + message));
+//		}
+		return ret;
+	}
+	
+	/**
+	 * Set the message stream buffer
+	 */
+	private void initialMessage() throws IOException
+	{
+		in = new DataInputStream(socket.getInputStream());
+		out = new DataOutputStream(socket.getOutputStream());	
+	}
+	
+	/**
+	 * Close the message stream buffer
+	 */
+	private void endMessage() throws IOException
+	{
+		if(in != null)
+			in.close();
+		if(out != null)
+			out.close();
 	}
 }

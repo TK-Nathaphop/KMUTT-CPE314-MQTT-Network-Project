@@ -1,22 +1,134 @@
 import java.io.*;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Scanner;
 
-public class Publisher extends Thread
+public class Publisher
 {
-	/** Port of the server to connect **/
-	private static int port = 9999;
+	/** Port of the socket to connect **/
+	private static int port = 50000;
 	
-	/** IP that connect to the server **/
+	/** IP that connect to the socket **/
 	private static String ip;
 	
-	/** Server that connect **/
-	private static Socket server;
+	/** socket that connect **/
+	private static Socket socket;
+	
+	/** Input stream for sending data to socket **/
+	private static DataInputStream in;
+	
+	/** Output stream for receiving data from socket **/
+	private static DataOutputStream out;
 	
 	public Publisher(String ip,int port)
 	{
-		this.port = port;
+		Publisher.port = port;
+	}
+	
+	/**
+	 * Main Function
+	 * @param args input argument
+	 * @throws IOException Exception from socket
+	 */
+	public static void main(String[] args) throws IOException
+	{
+		String[] fields;
+		while(true)
+		{
+			/* Loop until connect to the socket */
+			do
+			{
+				/* Get command from user */
+				fields = getCommand();
+				if(fields[0].equals("exit"))
+				{
+					System.out.println("Good bye");
+					System.exit(0);
+				}
+				else
+					ip = fields[1];
+	
+				/* Try connect to socket */
+				try
+				{
+					socket = new Socket(ip, port);
+					socket.setSoTimeout(3000);
+				}
+				catch (IOException e)
+				{
+					System.out.println("Cannot connect the socket");
+					System.out.println("Please try again");
+				}
+				
+				/* If connect to socket, display result and initial the message buffer stream */
+				if(socket != null)
+				{
+					System.out.println("Just connected to " + socket.getRemoteSocketAddress());
+					initialMessage();
+				}
+			} while(socket == null);
+			
+			/* Send the message to server */
+			writeMessage("publish " + fields[2] + " " + fields[3]);
+
+			/* Send exit message to server and disconnected */
+			writeMessage("exit");
+			endMessage();
+			socket.close();
+			socket = null;
+			
+			System.out.println("The message has sent already\n");
+		}
+	}
+	
+	/**
+	 * Read message from server and send the acknowledge message back 
+	 * @return Message that reading from server
+	 * @throws IOException
+	 */
+	public static String readMessage() throws IOException
+	{
+		String message = null;
+		if(in != null)
+			message = in.readUTF();
+//		if(out != null)
+//			out.writeUTF("[ACK] " + message);
+		return message;
+	}
+	
+	/**
+	 * Write message to server and wait for acknowledge from server
+	 * @param message
+	 * @return Return true if can write successfully. Otherwise, false.
+	 * @throws IOException
+	 */
+	public static boolean writeMessage(String message) throws IOException
+	{
+		boolean ret = true;
+		int count = 0;
+		int limit = 5;
+		if(out != null)
+			out.writeUTF(message);
+//		String ack;
+//		if(in != null)
+//		{
+//			do
+//			{
+//				ack = in.readUTF();
+//				if(!ack.equals("[ACK] " + message) && count < limit)
+//				{
+//					System.out.println("Cannot get [ACK] message from socket");
+//					System.out.println("["+count +"]" + "Try sending again");
+//					count++;
+//				}
+//				else if(count == limit)
+//				{
+//					System.out.println("Cannot get [ACK] message from socket");
+//					System.out.println("Exceeding limit [" + limit + "]. Stop sending ");
+//					ret = false;
+//				}
+//			}while (!ack.equals("[ACK] " + message));
+//		}
+		return ret;
 	}
 	
 	/**
@@ -43,9 +155,13 @@ public class Publisher extends Thread
 		return split;
 	}
 	
+	/**
+	 * Get command line from user and send to validate
+	 * @return return the array of command split in array
+	 */
 	private static String[] getCommand()
 	{
-		Scanner myObj = new Scanner(System.in);;
+		Scanner inputLine = new Scanner(System.in);
 		String command;
 		String[] fields;
 		/* Get command from user and validate the command */
@@ -53,7 +169,7 @@ public class Publisher extends Thread
 	    {
 	    	System.out.println("Please use command 'publish [ip] [topic] [data]' or 'exit'");
 	    	System.out.println("Ex: publish 127.0.0.1 / hello");
-	    	command = myObj.nextLine();
+	    	command = inputLine.nextLine();
 			fields = checkCommand(command);
 			if (fields == null)
 				System.out.println("\nCommand not correct. Please try again");
@@ -61,45 +177,23 @@ public class Publisher extends Thread
 	    return fields;
 	}
 	
-	public static void main(String[] args) throws IOException
+	/**
+	 * Set the message stream buffer
+	 */
+	private static void initialMessage() throws IOException
 	{
-		String[] fields;
-		while(true)
-		{
-			do
-			{
-				/* Get command from user */
-				fields = getCommand();
-				if(fields[0].equals("exit"))
-				{
-					System.out.println("Good bye");
-					System.exit(0);
-				}
-				else
-					ip = fields[1];
+		in = new DataInputStream(socket.getInputStream());
+		out = new DataOutputStream(socket.getOutputStream());	
+	}
 	
-				try
-				{
-					server = new Socket(ip, port);
-	//				server.setSoTimeout(30000);
-				}
-				catch (IOException e)
-				{
-					System.out.println("Cannot connect the server");
-					System.out.println("Please try again");
-				}
-	
-				if(server != null)
-				{
-					System.out.println("Just connected to " + server.getRemoteSocketAddress());
-				}
-			} while(server == null);
-			
-			
-			DataOutputStream out = new DataOutputStream(server.getOutputStream());
-			out.writeUTF(fields[0] + " " + fields[2] + " " + fields[3]);
-			server.close();
-			System.out.println("The message has sent already\n");
-		}
+	/**
+	 * Close the message stream buffer
+	 */
+	private static void endMessage() throws IOException
+	{
+		if(in != null)
+			in.close();
+		if(out != null)
+			out.close();
 	}
 }
