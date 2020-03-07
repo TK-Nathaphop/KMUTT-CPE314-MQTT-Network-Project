@@ -24,22 +24,20 @@ public class Subscriber
 	 * Main Function
 	 * @param args input argument
 	 */
-	public static void main(String[] args) throws IOException
+	public static void main(String[] args)
 	{
 		String[] fields;
 		/* Loop until can connect to the server */
 		do
 		{
-			/* Get command from user */
 			fields = getCommand();
-			/* If command is exit, exit program */
-			if(fields[0].equals("exit"))
+			if(fields[0].equals("exit")) //Command is exit
 			{
 				System.out.println("Good bye");
 				System.exit(0);
 			}
-			/* Set the IP of server */
-			ip = fields[1];
+			else
+				ip = fields[1];
 			
 			/* Try connect to the server */
 			try
@@ -52,40 +50,35 @@ public class Subscriber
 				System.out.println("\nCannot connect the socket");
 				System.out.println("Please try again");
 			}
-
-			/* If connect to server, display result and initial the message buffer stream */
-			if(socket != null)
-			{
-				System.out.println("\nJust connected to " + socket.getRemoteSocketAddress());
-				subscriberT = new SubscriberThread(socket, fields);
-			}
 		} while(socket == null);		
 
-		/* Start thread */
+		
+		/** If connect to the server, start thread to loop get message from server **/
+		System.out.println("\nJust connected to " + socket.getRemoteSocketAddress());
+		subscriberT = new SubscriberThread(socket, fields[2]);
 		subscriberT.start();
 		
-		/* Wait command exit from user */
+		/** Wait for exit command from user **/
 		Scanner inputLine = new Scanner(System.in);
 		String command;
 		do
 		{
+			/* Waiting some log message before wait input from user */
 			try
 			{
 				Thread.sleep(500);
 			}
 			catch (InterruptedException e)
 			{
-				e.printStackTrace();
 			}
-			System.out.println("Input 'exit' to disconnected from server and exit");
+			System.out.println("Type 'exit' to disconnected from server and exit");
 			command = inputLine.nextLine();
 		}while(!command.equals("exit"));
-		
-		System.out.println("Exit program");
+	
 		inputLine.close();
 		subscriberT.closeSocket();
-		
-		System.out.println("Bye bye");
+		System.out.println("Exit program");
+		System.out.println("Good bye");
 	}
 
 	/**
@@ -95,21 +88,52 @@ public class Subscriber
 	 */
 	private static String[] checkCommand(String command)
 	{
+		if (command == null || command.isEmpty()) // Check null
+			return null;
+
 		String split[] = command.split(" ");
 		if(command.equals("exit"))
 			return split;
-		if(split.length != 3)
+		else if(split.length != 3) //Check syntax is in format or not
 			return null;
-		/* Check syntax */
-		else if(!split[0].equals("subscribe"))
+		else if(!split[0].equals("subscribe")) //Check first syntax
 			return null;
-		/* Check that have ip or not */
-		else if(split[1].length() == 0)
+		else if(!checkIP(split[1])) //Check IP
 			return null;
-		/* Check the path is correct or not */
-		else if(split[2].charAt(0) != '/')
+		else if(split[2].charAt(0) != '/') //Check topic
 			return null;
 		return split;
+	}
+	
+	/**
+	 * Validate IP function
+	 * @param ip IP that want to validate
+	 * @return Return true if correct, otherwise false.
+	 */
+	public static boolean checkIP(String ip)
+	{
+		try {
+			if (ip == null || ip.isEmpty())
+				return false;
+			else if(ip.equals("localhost") || ip.equals("127.0.0.1"))
+				return true;
+			String[] parts = ip.split( "\\." );
+			if ( parts.length != 4 )
+				return false;
+			for (String s : parts )
+			{
+				int i = Integer.parseInt( s );
+				if ((i < 0) || (i > 255))
+					return false;
+			}
+			if (ip.endsWith(".") )
+				return false;
+			return true;
+			}
+		 catch (NumberFormatException nfe)
+		 {
+			 return false;
+		 }
 	}
 	
 	/**
@@ -148,142 +172,109 @@ class SubscriberThread extends Thread
 	
 	private static String topic;
 	
-	public SubscriberThread(Socket socket, String[] fields) throws IOException
+	public SubscriberThread(Socket socket, String topic)
 	{
 		SubscriberThread.socket = socket;
-		SubscriberThread.topic = fields[2];
-		initialMessage();
+		SubscriberThread.topic = topic;
 	}
 	
 	public void run()
 	{
-		/* Set time out to infinity */
+		/** Set buffer stream and send connected message to server **/
+		initialSocket();
+		writeMessage("subscribe " + topic);
+		
+		/** Set time out to infinity for continue waiting input **/
 		try
 		{
 			socket.setSoTimeout(0);
 		}
 		catch (SocketException e1)
 		{
-			e1.printStackTrace();
 		}
 		
-		/* Send connect message to server */
-		try
-		{
-			if(!writeMessage("subscribe " + topic))
-			{
-				System.out.println("\nExit program");
-				endMessage();
-				socket.close();
-				System.exit(0);
-			}
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-		}
-		
-		/* Loop get input from server and print */
+		/** Loop get input from server and print **/
 		while(true)
 		{
 			String message = null;
 			try
 			{
 				message = readMessage();
-			} catch (IOException e)
+			}
+			catch (IOException e)
 			{
 				break;
 			}
-
 			if(message != null)
 				System.out.println(message);
 		}
 	}
 	
 	/**
-	 * Read message from server and send the acknowledge message back 
-	 * @return Message that reading from server
-	 * @throws IOException
+	 * Read message from input stream.
+	 * @return Message that read from input stream.
+	 * @throws IOException 
 	 */
-	public static String readMessage() throws IOException
+	public String readMessage() throws IOException
 	{
 		String message = null;
 		if(in != null)
+		{
 			message = in.readUTF();
-//		if(out != null)
-//			out.writeUTF("[ACK] " + message);
+		}
 		return message;
 	}
 	
 	/**
-	 * Write message to server and wait for acknowledge from server
-	 * @param message
-	 * @return Return true if can write successfully. Otherwise, false.
-	 * @throws IOException
+	 * Write message to output stream
+	 * @param message Message that want to write into output stream
 	 */
-	public static boolean writeMessage(String message) throws IOException
+	public void writeMessage(String message)
 	{
-		boolean ret = true;
-		int count = 0;
-		int limit = 5;
 		if(out != null)
-			out.writeUTF(message);
-//		String ack;
-//		if(in != null)
-//		{
-//			do
-//			{
-//				ack = in.readUTF();
-//				if(!ack.equals("[ACK] " + message) && count < limit)
-//				{
-//					System.out.println("Cannot get [ACK] message from socket");
-//					System.out.println("["+count +"]" + "Try sending again");
-//					count++;
-//				}
-//				else if(count == limit)
-//				{
-//					System.out.println("Cannot get [ACK] message from socket");
-//					System.out.println("Exceeding limit [" + limit + "]. Stop sending ");
-//					ret = false;
-//				}
-//			}while (!ack.equals("[ACK] " + message));
-//		}
-		return ret;
+		{
+			try
+			{
+				out.writeUTF(message);
+			}
+			catch (IOException e)
+			{
+				closeSocket();
+			}
+		}
 	}
 
 	/**
 	 * Set the message stream buffer
 	 */
-	public void initialMessage() throws IOException
+	private void initialSocket()
 	{
-		in = new DataInputStream(socket.getInputStream());
-		out = new DataOutputStream(socket.getOutputStream());	
-	}
-	
-	/**
-	 * Close the message stream buffer
-	 */
-	public void endMessage() throws IOException
-	{
-		if(in != null)
-			in.close();
-		if(out != null)
-			out.close();
+		try
+		{
+			in = new DataInputStream(socket.getInputStream());
+			out = new DataOutputStream(socket.getOutputStream());
+		}
+		catch (IOException e)
+		{
+			System.out.println("Error: Buffer stream error occured");
+			closeSocket();
+		}
+		
 	}
 	
 	public void closeSocket()
 	{
 		try
 		{
-			/* Write exit message to server and exit */
 			writeMessage("exit");
-			endMessage();
-			System.out.println("Close socket");
+			if(in != null)
+				in.close();
+			if(out != null)
+				out.close();
 			socket.close();
 		}
-		catch (IOException e)
+		catch(Exception e)
 		{
-			e.printStackTrace();
 		}
 	}
 }

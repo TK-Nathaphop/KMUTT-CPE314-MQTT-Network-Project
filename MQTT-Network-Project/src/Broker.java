@@ -139,6 +139,8 @@ public class Broker
 		try {
 			if ( ip == null || ip.isEmpty() )
 				return false;
+			else if(ip.equals("localhost") || ip.equals("127.0.0.1"))
+				return true;
 			String[] parts = ip.split( "\\." );
 			if ( parts.length != 4 )
 				return false;
@@ -172,11 +174,11 @@ public class Broker
 	    	System.out.println("Input IP to bind: ");
 	    	System.out.print("> ");
 	    	ip = inputLine.nextLine();
-	    	if(!(ip.equals("localhost") || checkIP(ip)))
+	    	if(!checkIP(ip))
 	    	{
 	    		System.out.println("IP is not correct, please try again");
 	    	}
-	    } while(!(ip.equals("localhost") || checkIP(ip)));
+	    } while(!checkIP(ip));
 	    return ip;
 	}
 }
@@ -211,7 +213,7 @@ class BrokerThread extends Thread
 	/** Counter for id **/
 	private static int counter = 0;
 	
-	/** Used for error. Identifier for disconnect **/
+	/** Used for prevent error. Identifier for disconnect **/
 	private boolean bDis = false;
 	
 
@@ -233,7 +235,7 @@ class BrokerThread extends Thread
 	 */
 	public void run()
 	{
-		initialSocket(socket);
+		initialSocket();
 
 		/** Get connected message **/
 		String message = null;
@@ -243,7 +245,7 @@ class BrokerThread extends Thread
 		String fields[] = checkCommand(message);
 		if(fields == null) // Error occur
 		{
-			System.out.println("Error from data sending");
+			System.out.println("Error: Wrong connected message");
 			endSocket();
 		}
 		else //Continue
@@ -276,23 +278,38 @@ class BrokerThread extends Thread
 	 */
 	private String[] checkCommand(String command)
 	{
-		String split[] = command.split(" ");
-		if(split.length < 2)
+		if (command == null || command.isEmpty()) // Check null
 			return null;
-		if(split[0].equals("subscribe"))
-			if(split.length != 2)
-				split = null;
-			
-		else if(split[0].equals("publish"))
-			if(split.length < 3)
-				split = null;
-		else
-			split = null;
 		
-		/* Check the path is correct or not */
-		if(split[1].charAt(0) != '/')
-			split = null;
-		return split;
+		String split[] = command.split(" ");
+		String ret[] = null;
+		if(split[1].charAt(0) != '/') // Check topic
+			return null;
+
+		if(split[0].equals("subscribe")) //Check subscriber
+		{
+			if(split.length != 2) //Don't have only 2 segments
+				return null;
+			else
+				ret = split;
+		}
+		
+		else if(split[0].equals("publish")) //Check publisher
+		{
+			if(split.length < 3) //Have less than 3 segments
+				return null;
+			else
+			{
+				/** Set return value for publish **/
+				ret = new String[3];
+				ret[0] = split[0]; //Publish
+				ret[1] = split[1]; //Topic
+				ret[2] = split[2]; //Message
+				for(int i = 3; i < split.length; i++)
+					ret[2] = ret[3] + " " + split[i]; //Concat the rest message
+			}
+		}
+		return ret;
 	}
 	
 	/**
@@ -374,8 +391,8 @@ class BrokerThread extends Thread
 	}
 	
 	/**
-	 * Read message from client.
-	 * @return Message that read from client.
+	 * Read message from input stream.
+	 * @return Message that read from input stream.
 	 */
 	public String readMessage()
 	{
@@ -395,8 +412,8 @@ class BrokerThread extends Thread
 	}
 	
 	/**
-	 * Write message to client
-	 * @param message Message that want to write
+	 * Write message to output stream
+	 * @param message Message that want to write into output stream
 	 */
 	public void writeMessage(String message)
 	{
@@ -417,14 +434,13 @@ class BrokerThread extends Thread
 	 * Initial socket and buffer stream.
 	 * @param socket Connected socket that want to initial.
 	 */
-	private void initialSocket(Socket socket)
+	private void initialSocket()
 	{
-		
-		this.socket = socket;
 		try
 		{
 			in = new DataInputStream(socket.getInputStream());
 			out = new DataOutputStream(socket.getOutputStream());
+			bDis = false;
 		}
 		catch (IOException e)
 		{

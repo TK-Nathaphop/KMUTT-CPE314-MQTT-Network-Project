@@ -19,6 +19,9 @@ public class Publisher
 	/** Output stream for receiving data from socket **/
 	private static DataOutputStream out;
 	
+	/** Used for prevent error. Identifier for disconnect **/
+	private static boolean bDis = false;
+	
 	public Publisher(String ip,int port)
 	{
 		Publisher.port = port;
@@ -29,15 +32,15 @@ public class Publisher
 	 * @param args input argument
 	 * @throws IOException Exception from socket
 	 */
-	public static void main(String[] args) throws IOException
+	public static void main(String[] args)
 	{
 		String[] fields;
 		while(true)
 		{
-			/* Loop until connect to the socket */
+			/** Loop until connect to the socket **/
 			do
 			{
-				/* Get command from user */
+				/* Get Command */
 				fields = getCommand();
 				if(fields[0].equals("exit"))
 				{
@@ -58,77 +61,63 @@ public class Publisher
 					System.out.println("Cannot connect the socket");
 					System.out.println("Please try again");
 				}
-				
-				/* If connect to socket, display result and initial the message buffer stream */
-				if(socket != null)
-				{
-					System.out.println("Just connected to " + socket.getRemoteSocketAddress());
-					initialMessage();
-				}
 			} while(socket == null);
-			
-			/* Send the message to server */
+
+			/** Set buffer stream and send connected message to server **/
+			System.out.println("Just connected to " + socket.getRemoteSocketAddress());
+			initialSocket();
 			writeMessage("publish " + fields[2] + " " + fields[3]);
 
 			/* Send exit message to server and disconnected */
 			writeMessage("exit");
-			endMessage();
-			socket.close();
-			socket = null;
-			
-			System.out.println("The message has sent already\n");
+			if(bDis == false) // Do not have any error occurs before
+			{
+				System.out.println("The message has sent already\n");
+				closeSocket();
+			}
 		}
 	}
 	
 	/**
-	 * Read message from server and send the acknowledge message back 
-	 * @return Message that reading from server
-	 * @throws IOException
+	 * Read message from input stream.
+	 * @return Message that read from input stream.
 	 */
-	public static String readMessage() throws IOException
+	public static String readMessage()
 	{
 		String message = null;
 		if(in != null)
-			message = in.readUTF();
-//		if(out != null)
-//			out.writeUTF("[ACK] " + message);
+		{
+			try
+			{
+				message = in.readUTF();
+			}
+			catch (IOException e)
+			{
+				System.out.println("Error: Cannot read from server");
+				closeSocket();
+			}
+		}
 		return message;
 	}
 	
 	/**
-	 * Write message to server and wait for acknowledge from server
-	 * @param message
-	 * @return Return true if can write successfully. Otherwise, false.
-	 * @throws IOException
+	 * Write message to output stream
+	 * @param message Message that want to write into output stream
 	 */
-	public static boolean writeMessage(String message) throws IOException
+	public static void writeMessage(String message)
 	{
-		boolean ret = true;
-		int count = 0;
-		int limit = 5;
 		if(out != null)
-			out.writeUTF(message);
-//		String ack;
-//		if(in != null)
-//		{
-//			do
-//			{
-//				ack = in.readUTF();
-//				if(!ack.equals("[ACK] " + message) && count < limit)
-//				{
-//					System.out.println("Cannot get [ACK] message from socket");
-//					System.out.println("["+count +"]" + "Try sending again");
-//					count++;
-//				}
-//				else if(count == limit)
-//				{
-//					System.out.println("Cannot get [ACK] message from socket");
-//					System.out.println("Exceeding limit [" + limit + "]. Stop sending ");
-//					ret = false;
-//				}
-//			}while (!ack.equals("[ACK] " + message));
-//		}
-		return ret;
+		{
+			try
+			{
+				out.writeUTF(message);
+			}
+			catch (IOException e)
+			{
+				System.out.println("Error: Cannot write '" + message + "' to server");
+				closeSocket();
+			}
+		}
 	}
 	
 	/**
@@ -138,21 +127,61 @@ public class Publisher
 	 */
 	private static String[] checkCommand(String command)
 	{
+		if (command == null || command.isEmpty()) // Check null
+			return null;
+		
 		String split[] = command.split(" ");
 		if(command.equals("exit"))
 			return split;
-		if(split.length != 4)
+		else if(split.length < 4) //Check syntax is in format or not
 			return null;
-		/* Check syntax */
-		else if(!split[0].equals("publish"))
+		else if(!split[0].equals("publish")) //Check first syntax
 			return null;
-		/* Check that have ip or not */
-		else if(split[1].length() == 0)
+		else if(!checkIP(split[1])) //Check IP
 			return null;
-		/* Check the path is correct or not */
-		else if(split[2].charAt(0) != '/')
+		else if(split[2].charAt(0) != '/') //Check topic
 			return null;
-		return split;
+		
+		/** Set return value **/
+		String ret[] = new String[4];
+		ret[0] = split[0]; //Publish
+		ret[1] = split[1]; //IP
+		ret[2] = split[2]; //Topic
+		ret[3] = split[3]; //Message
+		for(int i = 4; i < split.length; i++)
+			ret[3] = ret[3] + " " + split[i]; //Concat the whole message
+		return ret;
+	}
+
+	/**
+	 * Validate IP function
+	 * @param ip IP that want to validate
+	 * @return Return true if correct, otherwise false.
+	 */
+	public static boolean checkIP(String ip)
+	{
+		try {
+			if (ip == null || ip.isEmpty())
+				return false;
+			else if(ip.equals("localhost") || ip.equals("127.0.0.1"))
+				return true;
+			String[] parts = ip.split( "\\." );
+			if ( parts.length != 4 )
+				return false;
+			for ( String s : parts )
+			{
+				int i = Integer.parseInt( s );
+				if ((i < 0) || (i > 255))
+					return false;
+			}
+			if (ip.endsWith(".") )
+				return false;
+			return true;
+			}
+		 catch (NumberFormatException nfe)
+		 {
+			 return false;
+		 }
 	}
 	
 	/**
@@ -169,6 +198,7 @@ public class Publisher
 	    {
 	    	System.out.println("Please use command 'publish [ip] [topic] [data]' or 'exit'");
 	    	System.out.println("Ex: publish 127.0.0.1 / hello");
+	    	System.out.print("> ");
 	    	command = inputLine.nextLine();
 			fields = checkCommand(command);
 			if (fields == null)
@@ -180,20 +210,42 @@ public class Publisher
 	/**
 	 * Set the message stream buffer
 	 */
-	private static void initialMessage() throws IOException
+	private static void initialSocket()
 	{
-		in = new DataInputStream(socket.getInputStream());
-		out = new DataOutputStream(socket.getOutputStream());	
+		try
+		{
+			in = new DataInputStream(socket.getInputStream());
+			out = new DataOutputStream(socket.getOutputStream());
+			bDis = false;
+		}
+		catch (IOException e)
+		{
+			System.out.println("Error: Buffer stream error occured");
+			closeSocket();
+		}
+		
 	}
 	
-	/**
-	 * Close the message stream buffer
-	 */
-	private static void endMessage() throws IOException
+	private static void closeSocket()
 	{
-		if(in != null)
-			in.close();
-		if(out != null)
-			out.close();
+		if(!bDis)
+		{
+			try
+			{
+				if(in != null)
+					in.close();
+				if(out != null)
+					out.close();
+				socket.close();
+			}
+			catch(Exception e)
+			{
+			}
+		}
+		/* Set to true to know that have already close socket */
+		bDis = true;
+		
+		/* Set to null for next socket connection */
+		socket = null;
 	}
 }
