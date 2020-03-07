@@ -21,8 +21,8 @@ public class Broker
 	/** Server **/
 	private static ServerSocket server;
 	
-	/** All of the connected client **/
-	private static ArrayList<Client> clientList = new ArrayList<Client>();
+	/** All of the connected BrokerThread **/
+	private static ArrayList<BrokerThread> BrokerThreadList = new ArrayList<BrokerThread>();
 	
 	/** Constructor for set the port **/
 	public Broker(int port)
@@ -62,15 +62,15 @@ public class Broker
 			{ 
 				System.out.println("Waiting for connection on port " + server.getLocalPort());
 				
-				/* The Client is connect to the server */
+				/* The BrokerThread is connect to the server */
 				Socket socket = server.accept();
-				System.out.println("Have client connected");
+				System.out.println("Have BrokerThread connected");
 				
-				Client client = new Client(socket);
-				clientList.add(client);
+				BrokerThread BrokerThread = new BrokerThread(socket);
+				BrokerThreadList.add(BrokerThread);
 				
 				/* Start thread */
-				client.start();
+				BrokerThread.start();
 				Thread.sleep(500);
 			}
 			catch (Exception e)
@@ -100,17 +100,17 @@ public class Broker
 	}
 	
 	/**
-	 * Send all client out.
-	 * @return Array list of client
+	 * Send all BrokerThread out.
+	 * @return Array list of BrokerThread
 	 */
-	public static ArrayList<Client> getAllClient()
+	public static ArrayList<BrokerThread> getAllBrokerThread()
 	{
-		return clientList;
+		return BrokerThreadList;
 	}
 	
-	public static void removeClient(Client client)
+	public static void removeBrokerThread(BrokerThread BrokerThread)
 	{
-		clientList.remove(client);
+		BrokerThreadList.remove(BrokerThread);
 	}
 	
 	public static boolean checkIP(String ip)
@@ -158,19 +158,19 @@ public class Broker
 
 
 /**
- * Client thread after connect to the server
+ * BrokerThread thread after connect to the server
  * @author Group No.4
  *
  */
-class Client extends Thread
+class BrokerThread extends Thread
 {
-	/** Socket connection from client **/
+	/** Socket connection from BrokerThread **/
 	private Socket socket;
 	
-	/** Input stream for sending data to client **/
+	/** Input stream for sending data to BrokerThread **/
 	private DataInputStream in;
 	
-	/** Output stream for receiving data from client **/
+	/** Output stream for receiving data from BrokerThread **/
 	private DataOutputStream out;
 	
 	/** Path connection **/
@@ -184,9 +184,9 @@ class Client extends Thread
 	private static int counter = 0;
 	
 
-	/** Constructor for client 
+	/** Constructor for BrokerThread 
 	 * @throws IOException **/
-	public Client(Socket socket)
+	public BrokerThread(Socket socket)
 	{
 		id = counter;
 		counter++;
@@ -200,14 +200,14 @@ class Client extends Thread
 		}
 	}
 
-	/** Running thread. Get command and data from client, then check that
+	/** Running thread. Get command and data from BrokerThread, then check that
 	 * either subscriber or publisher.
 	 * If subscriber, loop receive get input.
 	 * If publisher, just send data to all related subscriber.
 	 */
 	public void run()
 	{
-		/* Get the data command from client */
+		/* Get the data command from BrokerThread */
 		String message = null;
 		
 		try
@@ -259,8 +259,8 @@ class Client extends Thread
 			}
 		}
 		
-		Broker.removeClient(this);
-		System.out.println("Client is disconnected\n");
+		Broker.removeBrokerThread(this);
+		System.out.println("BrokerThread is disconnected\n");
 		try
 		{
 			endMessage();
@@ -306,7 +306,7 @@ class Client extends Thread
 	public void subscriber()
 	{
 		String message = "";
-		System.out.println("Client is subscriber\n");
+		System.out.println("BrokerThread is subscriber\n");
 		while(!message.equals("exit"))
 		{
 			try
@@ -328,17 +328,17 @@ class Client extends Thread
 	 */
 	public void publisher(String message) throws IOException
 	{
-		System.out.println("Client is publisher\n");
-		ArrayList<Client> clientList = Broker.getAllClient();
+		System.out.println("BrokerThread is publisher\n");
+		ArrayList<BrokerThread> BrokerThreadList = Broker.getAllBrokerThread();
 		
 		/** Loop send message to all subscriber in topic **/
-		for (int i = 0; i < clientList.size(); i++)
+		for (int i = 0; i < BrokerThreadList.size(); i++)
 		{
-			Client client = clientList.get(i);
-			if(client.isSub() && client.checkTopic(this.topic))
+			BrokerThread BrokerThread = BrokerThreadList.get(i);
+			if(BrokerThread.isSub() && BrokerThread.checkTopic(this.topic))
 			{
 				System.out.println("Write to subscriber id " + id +": " + message);
-				client.writeMessage(message);
+				BrokerThread.writeMessage(message);
 			}
 		}
 		
