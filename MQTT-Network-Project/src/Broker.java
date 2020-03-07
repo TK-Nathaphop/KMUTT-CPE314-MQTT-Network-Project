@@ -6,13 +6,15 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
- * Broker implementation. Can send all data from publisher to subscriber.
+ * MQTT implementation, which implement in Broker role.
+ * Get subscriber to wait for message
+ * and let publisher to send message to all subscriber.
  * @author Group No.4
  *
  */
 public class Broker
 {
-	/** Ip of server **/
+	/** IP of server **/
 	private static String ip = "localhost";
 	
 	/** Port of server **/
@@ -31,22 +33,24 @@ public class Broker
 	}
 	
 	/**
-	 * 
+	 * Main Function. Loop wait client to connect to the server and start thread.
 	 * @param args
 	 * @throws IOException
 	 */
-	static public void main(String[] args) throws IOException
+	static public void main(String[] args)
 	{
 		/* Ask IP to bind */
 		while(true)
 		{
 			String ip = getIp();
-			InetAddress address=InetAddress.getByName(ip);  
+			InetAddress address = null;
 			int backlog = 30;
+
 			try
 			{
-			server = new ServerSocket(port, backlog, address);
-			break;
+				address = InetAddress.getByName(ip);
+				server = new ServerSocket(port, backlog, address);
+				break;
 			}
 			catch(Exception e)
 			{
@@ -58,34 +62,42 @@ public class Broker
 		/* Loop wait user to connect */
 		while(true)
 		{
+			/* Wait for client connect to the server */
+			System.out.println("Waiting for connection on port " + server.getLocalPort());			
+			Socket socket = null;
 			try
-			{ 
-				System.out.println("Waiting for connection on port " + server.getLocalPort());
-				
-				/* The BrokerThread is connect to the server */
-				Socket socket = server.accept();
-				System.out.println("Have BrokerThread connected");
-				
-				BrokerThread BrokerThread = new BrokerThread(socket);
-				BrokerThreadList.add(BrokerThread);
-				
-				/* Start thread */
-				BrokerThread.start();
-				Thread.sleep(500);
-			}
-			catch (Exception e)
 			{
-				System.out.println(e.toString());
+				socket = server.accept();
+			}
+			catch(Exception e)
+			{
 				try
 				{
 					server.close();
-					System.out.println("Bye bye");
-					break;
 				}
-				catch (IOException el)
+				catch (IOException e1)
 				{
-					el.printStackTrace();
 				}
+				System.out.println("Good bye");
+				System.exit(0);
+			}
+			System.out.println("Client is connected");
+			
+			/* Start thread server for multiple connection*/
+			BrokerThread BrokerThread = new BrokerThread(socket);
+			BrokerThreadList.add(BrokerThread);
+			
+			/* Start thread */
+			BrokerThread.start();
+			
+			/* Waiting some log message before get next client */
+			try
+			{
+				Thread.sleep(500);
+			}
+			catch (InterruptedException e)
+			{
+				System.out.println("Error: There are problem in thread");
 			}
 		}
 	}
@@ -100,7 +112,7 @@ public class Broker
 	}
 	
 	/**
-	 * Send all BrokerThread out.
+	 * Send all connected Client.
 	 * @return Array list of BrokerThread
 	 */
 	public static ArrayList<BrokerThread> getAllBrokerThread()
@@ -108,11 +120,20 @@ public class Broker
 		return BrokerThreadList;
 	}
 	
+	/**
+	 * Remove disconnected Client.
+	 * @param BrokerThread Client that want to delete.
+	 */
 	public static void removeBrokerThread(BrokerThread BrokerThread)
 	{
 		BrokerThreadList.remove(BrokerThread);
 	}
 	
+	/**
+	 * Validate IP function
+	 * @param ip IP that want to validate
+	 * @return Return true if correct, otherwise false.
+	 */
 	public static boolean checkIP(String ip)
 	{
 		try {
@@ -137,6 +158,10 @@ public class Broker
 		 }
 	}
 	
+	/**
+	 * Get IP from user and validate it.
+	 * @return String of IP
+	 */
 	public static String getIp()
 	{
 		Scanner inputLine = new Scanner(System.in);
@@ -158,124 +183,96 @@ public class Broker
 
 
 /**
- * BrokerThread thread after connect to the server
+ * Thread to run after client connect to the server.
+ * Handle both subscriber and publisher that connect to the server.
  * @author Group No.4
  *
  */
 class BrokerThread extends Thread
 {
-	/** Socket connection from BrokerThread **/
+	/** Socket connection **/
 	private Socket socket;
 	
-	/** Input stream for sending data to BrokerThread **/
+	/** Input stream for sending data **/
 	private DataInputStream in;
 	
-	/** Output stream for receiving data from BrokerThread **/
+	/** Output stream for receiving data **/
 	private DataOutputStream out;
 	
 	/** Path connection **/
 	private String topic;
 	
-	/** Identifier it's subscriber or publisher */
+	/** Identifier for subscriber or publisher */
 	private boolean bSub;
 	
+	/** Id of client **/
 	private int id;
 	
+	/** Counter for id **/
 	private static int counter = 0;
 	
+	/** Used for error. Identifier for disconnect **/
+	private boolean bDis = false;
+	
 
-	/** Constructor for BrokerThread 
-	 * @throws IOException **/
+	/**
+	 * Constructor of BrokerThread. Set socket and Id of instance.
+	 * @param socket
+	 */
 	public BrokerThread(Socket socket)
 	{
 		id = counter;
 		counter++;
 		this.socket = socket;
-		try
-		{
-			initialMessage();
-		}
-		catch (IOException e)
-		{
-		}
 	}
 
-	/** Running thread. Get command and data from BrokerThread, then check that
-	 * either subscriber or publisher.
-	 * If subscriber, loop receive get input.
-	 * If publisher, just send data to all related subscriber.
+	/** Running thread. Get connected message from client,
+	 * then validate message and check that whether subscriber or publisher.
+	 * If subscriber, loop wait for input, until exit command exist.
+	 * If publisher, send data to subscriber on topic.
 	 */
 	public void run()
 	{
-		/* Get the data command from BrokerThread */
-		String message = null;
-		
-		try
-		{
-			message = readMessage();
-		}
-		catch (IOException e1)
-		{
-		}
+		initialSocket(socket);
 
-		String fields[] = checkCommand(message);
+		/** Get connected message **/
+		String message = null;
+		message = readMessage();
 		
-		/* If get null from check command, means the command is wrong */
-		if(fields == null)
+		/** Validate the connected message **/
+		String fields[] = checkCommand(message);
+		if(fields == null) // Error occur
 		{
 			System.out.println("Error from data sending");
-			try
-			{
-				endMessage();
-				socket.close();
-			}
-			catch (IOException e)
-			{
-			}
+			endSocket();
+		}
+		else //Continue
+		{
+			this.topic = fields[1];
 			
-		}
-		
-		/* Keep the topic */
-		this.topic = fields[1];
-		
-		/** If it is subscriber, loop and wait until exit */
-		if(fields[0].equals("subscribe"))
-		{
-			bSub = true;
-			subscriber();
-		}
-
-		/** If it is publisher, send the data to all subscriber in topic */
-		else if(fields[0].equals("publish"))
-		{
-			bSub = false;
-			try
+			/** If it is subscriber, loop and wait for 'exit' */
+			if(fields[0].equals("subscribe"))
 			{
+				bSub = true;
+				subscriber();
+			}
+	
+			/** If it is publisher, send the data to all subscriber in topic */
+			else if(fields[0].equals("publish"))
+			{
+				bSub = false;
 				publisher(fields[2]);
 			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
-			}
-		}
-		
-		Broker.removeBrokerThread(this);
-		System.out.println("BrokerThread is disconnected\n");
-		try
-		{
-			endMessage();
-			socket.close();
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
+
+			System.out.println("Client id:"+ id + " is disconnected");
+			endSocket();
 		}
 	}
 	
 	/**
-	 * Check the command is correct or not.
-	 * @param command String that want to validate
-	 * @return The array of string that contains first array for
+	 * Check the connected message is correct or not.
+	 * @param Connected message that want to validate
+	 * @return Separated message in each type.
 	 */
 	private String[] checkCommand(String command)
 	{
@@ -287,7 +284,7 @@ class BrokerThread extends Thread
 				split = null;
 			
 		else if(split[0].equals("publish"))
-			if(split.length != 3)
+			if(split.length < 3)
 				split = null;
 		else
 			split = null;
@@ -299,63 +296,65 @@ class BrokerThread extends Thread
 	}
 	
 	/**
-	 * Continue loop and waiting publisher to publish the data
-	 * until use "exit" command.
+	 * Continue loop and waiting publisher to publish the data,
+	 * until client send the "exit" command.
 	 * @param fields
 	 */
 	public void subscriber()
 	{
 		String message = "";
-		System.out.println("BrokerThread is subscriber\n");
-		while(!message.equals("exit"))
+		System.out.println("Client id:" + id + " is subscriber\n");
+		try
 		{
-			try
+			while(!message.equals("exit"))
 			{
 				message = readMessage();
-			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
-			}
+			}	
+		}
+		catch(Exception e)
+		{
+			endSocket();
 		}
 	}
 	
 	
 	/**
-	 * Get input and send to all subscriber
+	 * Get input and send message to all subscriber in topic
 	 * @param fields
 	 * @throws IOException 
 	 */
-	public void publisher(String message) throws IOException
+	public void publisher(String message)
 	{
-		System.out.println("BrokerThread is publisher\n");
-		ArrayList<BrokerThread> BrokerThreadList = Broker.getAllBrokerThread();
+		System.out.println("Client id:" + id + " is publisher\n");
+		System.out.println("Message: '"+ message +"'\n");
 		
 		/** Loop send message to all subscriber in topic **/
+		ArrayList<BrokerThread> BrokerThreadList = Broker.getAllBrokerThread();
 		for (int i = 0; i < BrokerThreadList.size(); i++)
 		{
 			BrokerThread BrokerThread = BrokerThreadList.get(i);
+			
 			if(BrokerThread.isSub() && BrokerThread.checkTopic(this.topic))
 			{
-				System.out.println("Write to subscriber id " + id +": " + message);
+				System.out.println("Write message to subscriber id:" + id);
 				BrokerThread.writeMessage(message);
 			}
 		}
-		
+		System.out.println("");
+
 		/** Wait for exit command from publisher **/
 		String exit = readMessage();
 		if(!exit.equals("exit"))
 		{
 			System.out.println("Error: Cannot get exit message from publisher");
-			System.out.println("Error occur exit program");
-			System.exit(0);
+			endSocket();
 		}
 	}
 	
 	/**
-	 * Check that topic is the same with current topic or not
+	 * Check that topic is same with current topic or not
 	 * @param topic Topic that want to check
-	 * @return True for the same topic and false for not the same
+	 * @return If same topic, true. Otherwise, false.
 	 */
 	public boolean checkTopic(String topic)
 	{
@@ -365,79 +364,100 @@ class BrokerThread extends Thread
 			return false;
 	}
 	
+	/**
+	 * Check that current connection is subscriber or publisher.
+	 * @return True for subscriber. Otherwise, False.
+	 */
 	public boolean isSub()
 	{
 		return bSub;
 	}
 	
 	/**
-	 * Read message from server and send the acknowledge message back 
-	 * @return Message that reading from server
-	 * @throws IOException
+	 * Read message from client.
+	 * @return Message that read from client.
 	 */
-	public String readMessage() throws IOException
+	public String readMessage()
 	{
 		String message = null;
 		if(in != null)
-			message = in.readUTF();
-//		if(out != null)
-//			out.writeUTF("[ACK] " + message);
+		{
+			try
+			{
+				message = in.readUTF();
+			}
+			catch (IOException e)
+			{
+				endSocket();
+			}
+		}
 		return message;
 	}
 	
 	/**
-	 * Write message to server and wait for acknowledge from server
-	 * @param message
-	 * @return Return true if can write successfully. Otherwise, false.
-	 * @throws IOException
+	 * Write message to client
+	 * @param message Message that want to write
 	 */
-	public boolean writeMessage(String message) throws IOException
+	public void writeMessage(String message)
 	{
-		boolean ret = true;
-		int count = 0;
-		int limit = 5;
 		if(out != null)
-			out.writeUTF(message);
-//		String ack;
-//		if(in != null)
-//		{
-//			do
-//			{
-//				ack = in.readUTF();
-//				if(!ack.equals("[ACK] " + message) && count < limit)
-//				{
-//					System.out.println("Cannot get [ACK] message from socket");
-//					System.out.println("["+count +"]" + "Try sending again");
-//					count++;
-//				}
-//				else if(count == limit)
-//				{
-//					System.out.println("Cannot get [ACK] message from socket");
-//					System.out.println("Exceeding limit [" + limit + "]. Stop sending ");
-//					ret = false;
-//				}
-//			}while (!ack.equals("[ACK] " + message));
-//		}
-		return ret;
+		{
+			try
+			{
+				out.writeUTF(message);
+			}
+			catch (IOException e)
+			{
+				endSocket();
+			}
+		}
 	}
 	
 	/**
-	 * Set the message stream buffer
+	 * Initial socket and buffer stream.
+	 * @param socket Connected socket that want to initial.
 	 */
-	private void initialMessage() throws IOException
+	private void initialSocket(Socket socket)
 	{
-		in = new DataInputStream(socket.getInputStream());
-		out = new DataOutputStream(socket.getOutputStream());	
+		
+		this.socket = socket;
+		try
+		{
+			in = new DataInputStream(socket.getInputStream());
+			out = new DataOutputStream(socket.getOutputStream());
+		}
+		catch (IOException e)
+		{
+			endSocket();
+		}
+			
 	}
 	
 	/**
-	 * Close the message stream buffer
+	 * Close the buffer stream and socket. Then remove client from list.
 	 */
-	private void endMessage() throws IOException
+	private void endSocket()
 	{
-		if(in != null)
-			in.close();
-		if(out != null)
-			out.close();
+		/* If haven't close socket/buffer stream, close it */
+		if(!bDis)
+		{
+			try
+			{
+				if(in != null)
+					in.close();
+				if(out != null)
+					out.close();
+				socket.close();
+			}
+			catch(IOException e)
+			{
+			}
+			
+			/* After close socket, remove client from list */
+			Broker.removeBrokerThread(this);
+		}
+		
+		/* Set to true to know that have already close socket */
+		bDis = true;
 	}
 }
