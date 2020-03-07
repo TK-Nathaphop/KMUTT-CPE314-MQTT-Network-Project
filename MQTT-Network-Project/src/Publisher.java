@@ -40,6 +40,8 @@ public class Publisher
 			/** Loop until connect to the socket **/
 			do
 			{
+				socket = null;
+				
 				/* Get Command */
 				fields = getCommand();
 				if(fields[0].equals("exit"))
@@ -50,7 +52,7 @@ public class Publisher
 				else
 					ip = fields[1];
 	
-				/* Try connect to socket */
+				/* Try connect to the server */
 				try
 				{
 					socket = new Socket(ip, port);

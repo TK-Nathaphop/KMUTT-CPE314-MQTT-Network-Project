@@ -30,6 +30,9 @@ public class Subscriber
 		/* Loop until can connect to the server */
 		do
 		{
+			socket = null;
+			
+			/* Get Command */
 			fields = getCommand();
 			if(fields[0].equals("exit")) //Command is exit
 			{
@@ -53,7 +56,7 @@ public class Subscriber
 		} while(socket == null);		
 
 		
-		/** If connect to the server, start thread to loop get message from server **/
+		/** If connect to the server, start thread for looping get message from server **/
 		System.out.println("\nJust connected to " + socket.getRemoteSocketAddress());
 		subscriberT = new SubscriberThread(socket, fields[2]);
 		subscriberT.start();
@@ -106,7 +109,8 @@ public class Subscriber
 	}
 	
 	/**
-	 * Validate IP function
+	 * Validate IP function.
+	 * References: https://stackoverflow.com/questions/4581877/validating-ipv4-string-in-java
 	 * @param ip IP that want to validate
 	 * @return Return true if correct, otherwise false.
 	 */
