@@ -1,7 +1,9 @@
 import java.io.*;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
  * Broker implementation. Can send all data from publisher to subscriber.
@@ -10,6 +12,9 @@ import java.util.ArrayList;
  */
 public class Broker
 {
+	/** Ip of server **/
+	private static String ip = "localhost";
+	
 	/** Port of server **/
 	private static int port = 50000;
 	
@@ -32,8 +37,25 @@ public class Broker
 	 */
 	static public void main(String[] args) throws IOException
 	{
-		server = new ServerSocket(port);
-//		server.setSoTimeout(30000);
+		/* Ask IP to bind */
+		while(true)
+		{
+			String ip = getIp();
+			InetAddress address=InetAddress.getByName(ip);  
+			int backlog = 30;
+			try
+			{
+			server = new ServerSocket(port, backlog, address);
+			break;
+			}
+			catch(Exception e)
+			{
+				System.out.println("Cannot connect to the ip");
+				System.out.println();
+			}
+		}
+
+		/* Loop wait user to connect */
 		while(true)
 		{
 			try
@@ -90,6 +112,48 @@ public class Broker
 	{
 		clientList.remove(client);
 	}
+	
+	public static boolean checkIP(String ip)
+	{
+		try {
+			if ( ip == null || ip.isEmpty() )
+				return false;
+			String[] parts = ip.split( "\\." );
+			if ( parts.length != 4 )
+				return false;
+			for ( String s : parts )
+			{
+				int i = Integer.parseInt( s );
+				if ( (i < 0) || (i > 255) )
+					return false;
+			}
+			if ( ip.endsWith(".") )
+				return false;
+			return true;
+			}
+		 catch (NumberFormatException nfe)
+		 {
+			 return false;
+		 }
+	}
+	
+	public static String getIp()
+	{
+		Scanner inputLine = new Scanner(System.in);
+		String ip;
+		/* Get command from user and validate the command */
+	    do
+	    {
+	    	System.out.println("Input IP to bind: ");
+	    	System.out.print("> ");
+	    	ip = inputLine.nextLine();
+	    	if(!(ip.equals("localhost") || checkIP(ip)))
+	    	{
+	    		System.out.println("IP is not correct, please try again");
+	    	}
+	    } while(!(ip.equals("localhost") || checkIP(ip)));
+	    return ip;
+	}
 }
 
 
@@ -133,7 +197,6 @@ class Client extends Thread
 		}
 		catch (IOException e)
 		{
-			e.printStackTrace();
 		}
 	}
 
@@ -153,7 +216,6 @@ class Client extends Thread
 		}
 		catch (IOException e1)
 		{
-			e1.printStackTrace();
 		}
 
 		String fields[] = checkCommand(message);
@@ -169,7 +231,6 @@ class Client extends Thread
 			}
 			catch (IOException e)
 			{
-				e.printStackTrace();
 			}
 			
 		}
@@ -203,6 +264,7 @@ class Client extends Thread
 		try
 		{
 			endMessage();
+			socket.close();
 		}
 		catch (IOException e)
 		{
