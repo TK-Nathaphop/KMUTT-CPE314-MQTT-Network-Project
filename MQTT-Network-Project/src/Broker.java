@@ -259,6 +259,11 @@ class BrokerThread extends Thread
 				bSub = false;
 				publisher(fields[2]);
 			}
+			/** Otherwise, wrong connection **/
+			else
+			{
+				System.out.println("Error: Client id:" + id + " is neither subscriber or publisher");
+			}
 
 			System.out.println("Client id:"+ id + " is disconnected");
 			endSocket();

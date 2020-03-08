@@ -1,5 +1,7 @@
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.util.Scanner;
 
@@ -48,17 +50,18 @@ public class Subscriber
 				ip = fields[1];
 			
 			/* Try connect to the server */
+			SocketAddress socketAddr = new InetSocketAddress(ip, port);
 			try
 			{
-				socket = new Socket(ip, port);
-				socket.setSoTimeout(3000);
+				socket = new Socket();
+				socket.connect(socketAddr,30*1000);
+				socket.setSoTimeout(30000);
 			}
-			catch (IOException e)
+			catch (Exception e)
 			{
-				System.out.println("\nCannot connect the socket");
-				System.out.println("Please try again");
+				System.out.println("\nCannot connect to the server");
 			}
-		} while(socket == null);		
+		} while(socket == null || !socket.isConnected());		
 
 		
 		/** If connect to the server, start thread for looping get message from server **/
