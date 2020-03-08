@@ -149,10 +149,8 @@ public class Publisher
 
 		int init = split[0].length() + 1 + split[1].length() + 1 + split[2].length() + 1;
 		String message = command.substring(init, command.length());
-		System.out.println("Init: "+init);
 		if(message == null)
 			return null;
-//		return null;
 		/** Set return value **/
 		String ret[] = new String[4];
 		ret[0] = split[0]; //Publish
