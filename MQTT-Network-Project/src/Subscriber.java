@@ -108,11 +108,11 @@ public class Subscriber
 			return split;
 		else if(split.length != 3) //Check syntax is in format or not
 			return null;
-		else if(!split[0].equals("subscribe")) //Check first syntax
+		else if(split[0] == null || !split[0].equals("subscribe")) //Check first syntax
 			return null;
-		else if(!checkIP(split[1])) //Check IP
+		else if(split[1] == null || !checkIP(split[1])) //Check IP
 			return null;
-		else if(split[2].charAt(0) != '/') //Check topic
+		else if(split[2] == null || split[2].charAt(0) != '/') //Check topic
 			return null;
 		return split;
 	}
@@ -155,7 +155,7 @@ public class Subscriber
 	 */
 	private static String[] getCommand()
 	{
-		Scanner inputLine = new Scanner(System.in);
+		Scanner inputLine = new Scanner(System.in).useDelimiter("\n");;
 		String command;
 		String[] fields;
 		/* Get command from user and validate the command */

@@ -138,23 +138,27 @@ public class Publisher
 		String split[] = command.split(" ");
 		if(command.equals("exit"))
 			return split;
-		else if(split.length < 4) //Check syntax is in format or not
+		else if(split.length < 3) //Check syntax is in format or not
 			return null;
-		else if(!split[0].equals("publish")) //Check first syntax
+		else if(split[0] == null || !split[0].equals("publish")) //Check first syntax
 			return null;
-		else if(!checkIP(split[1])) //Check IP
+		else if(split[1] == null || !checkIP(split[1])) //Check IP
 			return null;
-		else if(split[2].charAt(0) != '/') //Check topic
+		else if(split[2] == null || split[2].charAt(0) != '/') //Check topic
 			return null;
-		
+
+		int init = split[0].length() + 1 + split[1].length() + 1 + split[2].length() + 1;
+		String message = command.substring(init, command.length());
+		System.out.println("Init: "+init);
+		if(message == null)
+			return null;
+//		return null;
 		/** Set return value **/
 		String ret[] = new String[4];
 		ret[0] = split[0]; //Publish
 		ret[1] = split[1]; //IP
 		ret[2] = split[2]; //Topic
-		ret[3] = split[3]; //Message
-		for(int i = 4; i < split.length; i++)
-			ret[3] = ret[3] + " " + split[i]; //Concat the whole message
+		ret[3] = message; //Message
 		return ret;
 	}
 

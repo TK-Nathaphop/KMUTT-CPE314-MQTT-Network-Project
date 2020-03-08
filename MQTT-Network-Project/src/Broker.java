@@ -160,7 +160,7 @@ public class Broker
 	 */
 	public static String getIp()
 	{
-		Scanner inputLine = new Scanner(System.in);
+		Scanner inputLine = new Scanner(System.in).useDelimiter("\n");;
 		String ip;
 		/* Get command from user and validate the command */
 	    do
@@ -282,10 +282,10 @@ class BrokerThread extends Thread
 		
 		String split[] = command.split(" ");
 		String ret[] = null;
-		if(split[1].charAt(0) != '/') // Check topic
+		if(split[1] == null || split[1].charAt(0) != '/') // Check topic
 			return null;
 
-		if(split[0].equals("subscribe")) //Check subscriber
+		if(split[0] == null || split[0].equals("subscribe")) //Check subscriber
 		{
 			if(split.length != 2) //Don't have only 2 segments
 				return null;
@@ -293,19 +293,22 @@ class BrokerThread extends Thread
 				ret = split;
 		}
 		
-		else if(split[0].equals("publish")) //Check publisher
+		else if(split[0] == null || split[0].equals("publish")) //Check publisher
 		{
-			if(split.length < 3) //Have less than 3 segments
+			if(split.length < 2) //Have less than 3 segments
 				return null;
 			else
 			{
+				int init = split[0].length() + 1 + split[1].length() + 1;
+				String message = command.substring(init, command.length());
+				if(message == null)
+					return null;
+
 				/** Set return value for publish **/
 				ret = new String[3];
 				ret[0] = split[0]; //Publish
 				ret[1] = split[1]; //Topic
-				ret[2] = split[2]; //Message
-				for(int i = 3; i < split.length; i++)
-					ret[2] = ret[3] + " " + split[i]; //Concat the rest message
+				ret[2] = message; //Topic
 			}
 		}
 		return ret;
