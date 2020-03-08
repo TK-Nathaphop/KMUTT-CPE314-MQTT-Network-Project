@@ -9,7 +9,7 @@ import java.util.Scanner;
  * MQTT implementation, which implement in Broker role.
  * Get subscriber to wait for message
  * and let publisher to send message to all subscriber.
- * @author Group No.4
+ * @author Group 4C
  */
 public class Broker
 {
@@ -181,7 +181,7 @@ public class Broker
 /**
  * Thread to run after client connect to the server.
  * Handle both subscriber and publisher that connect to the server.
- * @author Group No.4
+ * @author Group 4C
  *
  */
 class BrokerThread extends Thread

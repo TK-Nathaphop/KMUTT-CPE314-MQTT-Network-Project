@@ -8,7 +8,7 @@ import java.util.Scanner;
  * Get connection command from user then try to connect to the server
  * If can connect, create a thread and start thread to read message.
  * Otherwise, wait for command again.
- * @author Group No.4
+ * @author Group 4C
  */
 public class Subscriber
 {
@@ -171,7 +171,7 @@ public class Subscriber
 
 /**
  * Subscriber Thread. Loop get message from server until error occurs.
- * @author Group No.4
+ * @author Group 4C
  */
 class SubscriberThread extends Thread
 {

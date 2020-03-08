@@ -7,7 +7,7 @@ import java.util.Scanner;
  * Get command and try to connect.
  * If can connect, publish message and then close socket.
  * Else, Wait for command again.
- * @author Group No.4
+ * @author Group 4C
  */
 public class Publisher
 {
