@@ -10,7 +10,6 @@ import java.util.Scanner;
  * Get subscriber to wait for message
  * and let publisher to send message to all subscriber.
  * @author Group No.4
- *
  */
 public class Broker
 {
@@ -26,14 +25,8 @@ public class Broker
 	/** All of the connected BrokerThread **/
 	private static ArrayList<BrokerThread> BrokerThreadList = new ArrayList<BrokerThread>();
 	
-	/** Constructor for set the port **/
-	public Broker(int port)
-	{
-		setPort(port);
-	}
-	
 	/**
-	 * Main Function. Loop wait client to connect to the server and start thread.
+	 * Main Function. Wait client to connect to the server and start thread.
 	 * @param args
 	 * @throws IOException
 	 */
@@ -130,27 +123,28 @@ public class Broker
 	}
 	
 	/**
-	 * Validate IP function
+	 * Validate IP function.
+	 * References: https://stackoverflow.com/questions/4581877/validating-ipv4-string-in-java
 	 * @param ip IP that want to validate
 	 * @return Return true if correct, otherwise false.
 	 */
 	public static boolean checkIP(String ip)
 	{
 		try {
-			if ( ip == null || ip.isEmpty() )
+			if (ip == null || ip.isEmpty())
 				return false;
 			else if(ip.equals("localhost") || ip.equals("127.0.0.1"))
 				return true;
 			String[] parts = ip.split( "\\." );
-			if ( parts.length != 4 )
+			if (parts.length != 4)
 				return false;
-			for ( String s : parts )
+			for (String s : parts)
 			{
-				int i = Integer.parseInt( s );
-				if ( (i < 0) || (i > 255) )
+				int i = Integer.parseInt(s);
+				if ((i < 0) || (i > 255))
 					return false;
 			}
-			if ( ip.endsWith(".") )
+			if (ip.endsWith("."))
 				return false;
 			return true;
 			}

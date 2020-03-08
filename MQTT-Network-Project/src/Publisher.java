@@ -2,6 +2,13 @@ import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
 
+/**
+ * MQTT implementation, which implement in Publisher role.
+ * Get command and try to connect.
+ * If can connect, publish message and then close socket.
+ * Else, Wait for command again.
+ * @author Group No.4
+ */
 public class Publisher
 {
 	/** Port of the socket to connect **/
@@ -10,7 +17,7 @@ public class Publisher
 	/** IP that connect to the socket **/
 	private static String ip;
 	
-	/** socket that connect **/
+	/** Socket that connect **/
 	private static Socket socket;
 	
 	/** Input stream for sending data to socket **/
@@ -22,15 +29,8 @@ public class Publisher
 	/** Used for prevent error. Identifier for disconnect **/
 	private static boolean bDis = false;
 	
-	public Publisher(String ip,int port)
-	{
-		Publisher.port = port;
-	}
-	
 	/**
-	 * Main Function
-	 * @param args input argument
-	 * @throws IOException Exception from socket
+	 * Main Function. Loop ask for message and send message it to server.
 	 */
 	public static void main(String[] args)
 	{
@@ -156,7 +156,8 @@ public class Publisher
 	}
 
 	/**
-	 * Validate IP function
+	 * Validate IP function.
+	 * References: https://stackoverflow.com/questions/4581877/validating-ipv4-string-in-java
 	 * @param ip IP that want to validate
 	 * @return Return true if correct, otherwise false.
 	 */
@@ -188,7 +189,7 @@ public class Publisher
 	
 	/**
 	 * Get command line from user and send to validate
-	 * @return return the array of command split in array
+	 * @return return the array of command in segments
 	 */
 	private static String[] getCommand()
 	{
@@ -210,7 +211,7 @@ public class Publisher
 	}
 	
 	/**
-	 * Set the message stream buffer
+	 * Set the stream buffer and some initial value
 	 */
 	private static void initialSocket()
 	{
@@ -218,6 +219,8 @@ public class Publisher
 		{
 			in = new DataInputStream(socket.getInputStream());
 			out = new DataOutputStream(socket.getOutputStream());
+			
+			/* Set to false to know that we have connect, and have not disconnected */
 			bDis = false;
 		}
 		catch (IOException e)
@@ -228,6 +231,9 @@ public class Publisher
 		
 	}
 	
+	/**
+	 * Close input and output stream and set some value
+	 */
 	private static void closeSocket()
 	{
 		if(!bDis)
@@ -244,6 +250,7 @@ public class Publisher
 			{
 			}
 		}
+
 		/* Set to true to know that have already close socket */
 		bDis = true;
 		

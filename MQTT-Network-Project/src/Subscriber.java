@@ -3,6 +3,13 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Scanner;
 
+/**
+ * MQTT implementation, which implement in Subscriber role.
+ * Get connection command from user then try to connect to the server
+ * If can connect, create a thread and start thread to read message.
+ * Otherwise, wait for command again.
+ * @author Group No.4
+ */
 public class Subscriber
 {
 	/** Port of the server to connect **/
@@ -14,20 +21,18 @@ public class Subscriber
 	/** socket that connect **/
 	private static Socket socket;
 		
+	/** Subscriber Thread for loop read message from server. **/
 	private static SubscriberThread subscriberT;
-	public Subscriber(String ip, int port)
-	{
-		Subscriber.port = port;
-	}
 	
 	/**
-	 * Main Function
-	 * @param args input argument
+	 * Main Function. Ask for command and try to connected.
+	 * If be able to connect, start thread to read message.
+	 * Then wait for exit command.
 	 */
 	public static void main(String[] args)
 	{
 		String[] fields;
-		/* Loop until can connect to the server */
+		/* Loop until able to connect to the server */
 		do
 		{
 			socket = null;
@@ -66,18 +71,19 @@ public class Subscriber
 		String command;
 		do
 		{
-			/* Waiting some log message before wait input from user */
 			try
 			{
+				/* Waiting some log message */
 				Thread.sleep(500);
 			}
 			catch (InterruptedException e)
-			{
-			}
+			{}
+			
 			System.out.println("Type 'exit' to disconnected from server and exit");
 			command = inputLine.nextLine();
 		}while(!command.equals("exit"));
 	
+		/** Close connection **/
 		inputLine.close();
 		subscriberT.closeSocket();
 		System.out.println("Exit program");
@@ -142,7 +148,7 @@ public class Subscriber
 	
 	/**
 	 * Get command line from user and send to validate
-	 * @return return the array of command split in array
+	 * @return return the array of command in segments
 	 */
 	private static String[] getCommand()
 	{
@@ -163,6 +169,10 @@ public class Subscriber
 	}
 }
 
+/**
+ * Subscriber Thread. Loop get message from server until error occurs.
+ * @author Group No.4
+ */
 class SubscriberThread extends Thread
 {
 	/** socket that connect **/
@@ -174,14 +184,23 @@ class SubscriberThread extends Thread
 	/** Output stream for receiving data from server **/
 	private static DataOutputStream out;
 	
+	/** Topic to subscribe**/
 	private static String topic;
 	
+	/**
+	 * Set socket connection and topic
+	 * @param socket Socket that connected to the server
+	 * @param topic Topic that want to subscribe
+	 */
 	public SubscriberThread(Socket socket, String topic)
 	{
 		SubscriberThread.socket = socket;
 		SubscriberThread.topic = topic;
 	}
 	
+	/**
+	 * Thread run function, loop get message from server and print that message.
+	 */
 	public void run()
 	{
 		/** Set buffer stream and send connected message to server **/
@@ -195,6 +214,7 @@ class SubscriberThread extends Thread
 		}
 		catch (SocketException e1)
 		{
+			System.out.println("Error: Cannot set time out");
 		}
 		
 		/** Loop get input from server and print **/
@@ -223,9 +243,7 @@ class SubscriberThread extends Thread
 	{
 		String message = null;
 		if(in != null)
-		{
 			message = in.readUTF();
-		}
 		return message;
 	}
 	
@@ -265,7 +283,10 @@ class SubscriberThread extends Thread
 		}
 		
 	}
-	
+
+	/**
+	 * Close buffer stream, and server.
+	 */
 	public void closeSocket()
 	{
 		try
@@ -278,7 +299,6 @@ class SubscriberThread extends Thread
 			socket.close();
 		}
 		catch(Exception e)
-		{
-		}
+		{}
 	}
 }
